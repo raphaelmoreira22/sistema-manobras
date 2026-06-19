@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from pathlib import Path
+from supabase_client import supabase
 
 st.set_page_config(
     page_title="Sistema de Manobras",
@@ -10,66 +10,86 @@ st.set_page_config(
     layout="wide"
 )
 
-BANCO = "Banco_Manobras.xlsx"
+# =========================
+# NORMALIZAÇÃO PADRÃO
+# =========================
+def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = df.columns.str.strip().str.lower()
+
+    rename_map = {
+        "manobra": "manobra",
+        "dataman": "dataman",
+        "tipoman": "tipoman",
+        "descservicos": "descservicos",
+        "recursos": "recursos",
+        "gerencia": "gerencia",
+        "polo": "polo",
+        "dataimportacao": "dataimportacao"
+    }
+
+    df = df.rename(columns=rename_map)
+
+    if "dataman" in df.columns:
+        df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce")
+
+    return df
 
 
 # =========================
-# CARREGAR BANCO
+# SUPABASE - CARREGAR
 # =========================
+@st.cache_data(ttl=60)
 def carregar_banco():
+    try:
+        response = supabase.table("manobras").select("*").execute()
+        df = pd.DataFrame(response.data)
 
-    if Path(BANCO).exists():
+        if df.empty:
+            return pd.DataFrame()
 
-        df = pd.read_excel(BANCO)
+        return normalizar_df(df)
 
-        if "DataMan" in df.columns:
-            df["DataMan"] = pd.to_datetime(df["DataMan"], errors="coerce")
-
-        return df
-
-    return pd.DataFrame(columns=[
-        "Manobra",
-        "DataMan",
-        "TipoMan",
-        "DescServicos",
-        "Recursos",
-        "Gerencia",
-        "Polo",
-        "DataImportacao"
-    ])
+    except Exception as e:
+        st.error(f"Erro ao carregar Supabase: {e}")
+        return pd.DataFrame()
 
 
 # =========================
-# SALVAR BANCO
+# SUPABASE - UPSERT (EVITA DUPLICAÇÃO)
 # =========================
-def salvar_banco(df):
-    df.to_excel(BANCO, index=False)
+def salvar_no_supabase(df: pd.DataFrame):
+    if df.empty:
+        return
+
+    df = normalizar_df(df)
+
+    registros = df.to_dict(orient="records")
+
+    supabase.table("manobras").upsert(
+        registros,
+        on_conflict="manobra"
+    ).execute()
 
 
 # =========================
-# EXPORTAR EXCEL
+# EXPORT EXCEL
 # =========================
 def exportar_excel(df):
-
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False)
-
     return output.getvalue()
 
 
 # =========================
 # UI
 # =========================
-st.title("⚡ Sistema de Consulta de Manobras")
+st.title("⚡ Sistema de Manobras")
 
-st.subheader("📥 Importar Relatório Diário")
+st.subheader("📥 Importar relatório Excel")
 
-arquivo = st.file_uploader(
-    "Selecione o arquivo recebido por e-mail",
-    type=["xlsx"]
-)
+arquivo = st.file_uploader("Selecione o arquivo Excel", type=["xlsx"])
+
 
 # =========================
 # IMPORTAÇÃO
@@ -77,7 +97,6 @@ arquivo = st.file_uploader(
 if arquivo:
 
     try:
-
         df_novo = pd.read_excel(
             arquivo,
             sheet_name="qryExportRegistrosDetalhadosRDM"
@@ -93,21 +112,16 @@ if arquivo:
             "Polo"
         ]].copy()
 
-        df_novo["DataMan"] = pd.to_datetime(df_novo["DataMan"], errors="coerce")
         df_novo["DataImportacao"] = datetime.now()
 
-        banco = carregar_banco()
+        df_novo = normalizar_df(df_novo)
 
-        banco = pd.concat([banco, df_novo], ignore_index=True)
+        salvar_no_supabase(df_novo)
 
-        banco.drop_duplicates(subset=["Manobra"], keep="last", inplace=True)
+        st.success(f"{len(df_novo)} registros enviados ao Supabase.")
 
-        salvar_banco(banco)
-
-        st.success(f"{len(df_novo)} registros importados com sucesso.")
-
-    except Exception as erro:
-        st.error(f"Erro ao importar arquivo: {erro}")
+    except Exception as e:
+        st.error(f"Erro na importação: {e}")
 
 
 # =========================
@@ -117,162 +131,132 @@ df = carregar_banco()
 
 st.divider()
 
+st.subheader("🔎 Consulta")
+
 # =========================
 # FILTROS
 # =========================
-st.subheader("🔎 Consulta de Manobras")
-
 col1, col2 = st.columns(2)
 
 with col1:
-    manobra = st.text_input("Número da Manobra")
+    filtro_manobra = st.text_input("Manobra")
 
 with col2:
-    texto = st.text_input("Texto em DescServicos")
+    filtro_texto = st.text_input("Descrição")
+
 
 col1, col2 = st.columns(2)
 
 gerencias = ["Todas"]
-if len(df):
-    gerencias += sorted(df["Gerencia"].dropna().astype(str).unique())
+if not df.empty and "gerencia" in df.columns:
+    gerencias += sorted(df["gerencia"].dropna().unique())
+
+polos = ["Todos"]
+if not df.empty and "polo" in df.columns:
+    polos += sorted(df["polo"].dropna().unique())
 
 with col1:
     gerencia = st.selectbox("Gerência", gerencias)
 
-polos = ["Todos"]
-if len(df):
-    polos += sorted(df["Polo"].dropna().astype(str).unique())
-
 with col2:
     polo = st.selectbox("Polo", polos)
+
 
 # =========================
 # PERÍODO
 # =========================
-st.markdown("### 📅 Período da Manobra")
+st.markdown("### 📅 Período")
 
-if len(df) and "DataMan" in df.columns and df["DataMan"].notna().any():
-    data_min = df["DataMan"].min().date()
-    data_max = df["DataMan"].max().date()
+if not df.empty and "dataman" in df.columns and df["dataman"].notna().any():
+    data_min = df["dataman"].min().date()
+    data_max = df["dataman"].max().date()
 else:
     hoje = datetime.today().date()
     data_min = hoje
     data_max = hoje
 
-periodo = st.date_input(
-    "Selecione o período",
-    value=(data_min, data_max)
-)
+periodo = st.date_input("Selecione o período", value=(data_min, data_max))
+
 
 # =========================
 # FILTRO
 # =========================
 resultado = df.copy()
 
-if manobra:
-    resultado = resultado[
-        resultado["Manobra"].astype(str).str.contains(manobra, case=False, na=False)
-    ]
+if not resultado.empty:
 
-if texto:
-    resultado = resultado[
-        resultado["DescServicos"].astype(str).str.contains(texto, case=False, na=False)
-    ]
+    if filtro_manobra:
+        resultado = resultado[
+            resultado["manobra"].astype(str).str.contains(filtro_manobra, case=False, na=False)
+        ]
 
-if gerencia != "Todas":
-    resultado = resultado[resultado["Gerencia"].astype(str) == gerencia]
+    if filtro_texto:
+        resultado = resultado[
+            resultado["descservicos"].astype(str).str.contains(filtro_texto, case=False, na=False)
+        ]
 
-if polo != "Todos":
-    resultado = resultado[resultado["Polo"].astype(str) == polo]
+    if gerencia != "Todas":
+        resultado = resultado[resultado["gerencia"] == gerencia]
 
-if len(periodo) == 2 and "DataMan" in resultado.columns:
-    data_inicio = pd.Timestamp(periodo[0])
-    data_fim = pd.Timestamp(periodo[1])
+    if polo != "Todos":
+        resultado = resultado[resultado["polo"] == polo]
 
-    resultado = resultado[
-        (resultado["DataMan"] >= data_inicio) &
-        (resultado["DataMan"] <= data_fim)
-    ]
+    if isinstance(periodo, tuple) and len(periodo) == 2:
+        ini = pd.Timestamp(periodo[0])
+        fim = pd.Timestamp(periodo[1])
+
+        resultado = resultado[
+            (resultado["dataman"] >= ini) &
+            (resultado["dataman"] <= fim)
+        ]
+
 
 # =========================
-# MÉTRICAS (DINÂMICAS)
+# MÉTRICAS
 # =========================
-df_metric = resultado.copy()
-
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Total de Manobras", len(df_metric))
+    st.metric("Total", len(resultado))
 
 with col2:
-    qtd_gerencias = (
-        df_metric["Gerencia"].dropna().nunique()
-        if len(df_metric)
-        else 0
-    )
-
-    st.metric("Gerências", qtd_gerencias)
+    st.metric("Gerências", resultado["gerencia"].nunique() if not resultado.empty else 0)
 
 with col3:
     hoje = pd.Timestamp.today().date()
-
-    qtd_hoje = 0
-    if len(df_metric) and "DataMan" in df_metric.columns:
-        qtd_hoje = len(df_metric[df_metric["DataMan"].dt.date == hoje])
-
-    st.metric("Manobras Hoje", qtd_hoje)
+    qtd_hoje = len(resultado[resultado["dataman"].dt.date == hoje]) if not resultado.empty else 0
+    st.metric("Hoje", qtd_hoje)
 
 with col4:
-    qtd_complexas = 0
-
-    if len(df_metric) and "TipoMan" in df_metric.columns:
-        qtd_complexas = len(
-            df_metric[
-                df_metric["TipoMan"].astype(str).str.upper() == "COMPLEXA"
-            ]
-        )
+    qtd_complexas = len(
+        resultado[resultado["tipoman"].astype(str).str.upper() == "COMPLEXA"]
+    ) if not resultado.empty else 0
 
     st.metric("🚨 Complexas", qtd_complexas)
 
+
 # =========================
-# ORGANIZAÇÃO
+# EXIBIÇÃO
 # =========================
-resultado = resultado.sort_values(by="DataMan", ascending=False)
+resultado = resultado.sort_values("dataman", ascending=False)
 
-resultado_exibicao = resultado.copy()
+exibir = resultado.copy()
 
-# Destaque de manobras complexas
-if "TipoMan" in resultado_exibicao.columns:
+if not exibir.empty:
 
-    resultado_exibicao["Manobra"] = resultado_exibicao.apply(
-        lambda x: f"🚨 {x['Manobra']}"
-        if str(x["TipoMan"]).strip().upper() == "COMPLEXA"
-        else str(x["Manobra"]),
+    exibir["manobra"] = exibir.apply(
+        lambda x: f"🚨 {x['manobra']}" if str(x.get("tipoman", "")).upper() == "COMPLEXA" else x["manobra"],
         axis=1
     )
 
-# Formatação de data
-if "DataMan" in resultado_exibicao.columns:
-    resultado_exibicao["DataMan"] = resultado_exibicao["DataMan"].dt.strftime("%d/%m/%Y")
+    exibir["dataman"] = pd.to_datetime(exibir["dataman"]).dt.strftime("%d/%m/%Y")
 
-# Remove colunas técnicas
-resultado_exibicao = resultado_exibicao.drop(
-    columns=["TipoMan"],
-    errors="ignore"
-)
-
-# =========================
-# RESULTADO
-# =========================
 st.divider()
 
-st.subheader(f"📋 Resultado ({len(resultado)} registros)")
+st.subheader(f"📋 Resultado ({len(resultado)})")
 
-st.dataframe(
-    resultado_exibicao,
-    use_container_width=True,
-    height=650
-)
+st.dataframe(exibir, use_container_width=True, height=650)
+
 
 # =========================
 # EXPORTAÇÃO
@@ -280,12 +264,12 @@ st.dataframe(
 arquivo_excel = exportar_excel(resultado)
 
 st.download_button(
-    label="📤 Exportar Resultado",
+    "📤 Exportar",
     data=arquivo_excel,
-    file_name="resultado_manobras.xlsx",
+    file_name="manobras.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
 st.divider()
 
-st.caption("Sistema de Consulta de Manobras - Versão 1.1")
+st.caption("Sistema de Manobras - Supabase (Stable v1)")
