@@ -244,7 +244,7 @@ with col3:
 
         qtd_hoje = len(
                 resultado[
-                resultado["dataman"].dt.date == hoje
+                    resultado["dataman"].dt.date == hoje
             ]
         )
     else:
