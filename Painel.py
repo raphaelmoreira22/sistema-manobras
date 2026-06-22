@@ -35,7 +35,7 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
     if "dataimportacao" in df.columns:
         df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    return df
+return df
 
 
 # =========================
