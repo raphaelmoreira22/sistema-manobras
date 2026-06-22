@@ -30,7 +30,10 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     if "dataman" in df.columns:
-        df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce")
+    df["dataman"] = df["dataman"].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    if "dataimportacao" in df.columns:
+    df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     return df
 
@@ -118,7 +121,7 @@ if arquivo:
         df_novo = normalizar_df(df_novo)
 
         salvar_no_supabase(df_novo)
-
+        st.cache_data.clear()
         st.success(f"{len(df_novo)} registros enviados ao Supabase.")
 
     except Exception as e:
