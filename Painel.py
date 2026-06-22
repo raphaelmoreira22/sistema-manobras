@@ -228,12 +228,12 @@ with col2:
 
 with col3:
     if "dataman" in resultado.columns:
-    resultado["dataman"] = pd.to_datetime(resultado["dataman"], errors="coerce")
+        resultado["dataman"] = pd.to_datetime(resultado["dataman"], errors="coerce")
 
-    qtd_hoje = len(
-        resultado[
-            resultado["dataman"].dt.date == hoje
-        ]
+        qtd_hoje = len(
+            resultado[
+                resultado["dataman"].dt.date == hoje
+            ]
     )
     else:
         qtd_hoje = 0
