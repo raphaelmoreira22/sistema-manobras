@@ -243,7 +243,7 @@ with col3:
         )
 
         qtd_hoje = len(
-            resultado[
+                resultado[
                 resultado["dataman"].dt.date == hoje
             ]
         )
