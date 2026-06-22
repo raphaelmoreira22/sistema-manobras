@@ -30,10 +30,10 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     if "dataman" in df.columns:
-    df["dataman"] = df["dataman"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        df["dataman"] = df["dataman"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     if "dataimportacao" in df.columns:
-    df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     return df
 
