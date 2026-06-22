@@ -27,16 +27,19 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
         "dataimportacao": "dataimportacao"
     }
 
-    df = df.rename(columns=rename_map)
-
     if "dataman" in df.columns:
-        df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce", format="mixed")
+        df["dataman"] = pd.to_datetime(
+            df["dataman"],
+            errors="coerce",
+            format="mixed"
+        )
 
     if "dataimportacao" in df.columns:
         df["dataimportacao"] = pd.to_datetime(
-        df["dataimportacao"],
-        errors="coerce"
-    )
+            df["dataimportacao"],
+            errors="coerce",
+            format="mixed"
+        )
 
     return df
 
@@ -68,11 +71,26 @@ def carregar_banco():
 # =========================
 # SUPABASE - UPSERT (EVITA DUPLICAÇÃO)
 # =========================
+
 def salvar_no_supabase(df: pd.DataFrame):
+
     if df.empty:
         return
 
-    df = normalizar_df(df)
+    df = normalizar_df(df).copy()
+
+    # Converte datetime para string antes de enviar ao Supabase
+    if "dataman" in df.columns:
+        df["dataman"] = pd.to_datetime(
+            df["dataman"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    if "dataimportacao" in df.columns:
+        df["dataimportacao"] = pd.to_datetime(
+            df["dataimportacao"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d %H:%M:%S")
 
     registros = df.to_dict(orient="records")
 
@@ -80,7 +98,6 @@ def salvar_no_supabase(df: pd.DataFrame):
         registros,
         on_conflict="manobra"
     ).execute()
-
 
 # =========================
 # EXPORT EXCEL
