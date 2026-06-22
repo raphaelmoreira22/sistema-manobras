@@ -237,7 +237,7 @@ with col3:
     hoje = datetime.today().date()
 
     if "dataman" in resultado.columns:
-        resultado["dataman"] = pd.to_datetime(
+            resultado["dataman"] = pd.to_datetime(
             resultado["dataman"],
             errors="coerce"
         )
