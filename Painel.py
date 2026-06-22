@@ -33,7 +33,10 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
         df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce", format="mixed")
 
     if "dataimportacao" in df.columns:
-        df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
+    df["dataimportacao"] = pd.to_datetime(
+        df["dataimportacao"],
+        errors="coerce"
+    )
 
     return df
 
@@ -43,6 +46,10 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 @st.cache_data(ttl=60)
 def carregar_banco():
+
+    response = supabase.table("manobras").select("*").limit(1).execute()
+
+    st.write(response.data)
    
     try:
         response = supabase.table("manobras").select("*").execute()
@@ -227,16 +234,23 @@ with col2:
     st.metric("Gerências", resultado["gerencia"].nunique() if not resultado.empty else 0)
 
 with col3:
+    hoje = datetime.today().date()
+
     if "dataman" in resultado.columns:
-        resultado["dataman"] = pd.to_datetime(resultado["dataman"], errors="coerce")
+        resultado["dataman"] = pd.to_datetime(
+            resultado["dataman"],
+            errors="coerce"
+        )
 
         qtd_hoje = len(
             resultado[
                 resultado["dataman"].dt.date == hoje
             ]
-    )
+        )
     else:
         qtd_hoje = 0
+
+    st.metric("Hoje", qtd_hoje)
 
 with col4:
     qtd_complexas = len(
