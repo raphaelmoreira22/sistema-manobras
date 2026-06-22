@@ -63,10 +63,12 @@ def carregar_banco():
 
         return normalizar_df(df)
 
-    except Exception as e:
-        st.error(f"Erro ao carregar Supabase: {e}")
-        return pd.DataFrame()
+    
+    import traceback
 
+    except Exception as e:
+        st.error(str(e))
+        st.code(traceback.format_exc())
 
 # =========================
 # SUPABASE - UPSERT (EVITA DUPLICAÇÃO)
