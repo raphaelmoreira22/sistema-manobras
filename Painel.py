@@ -33,7 +33,7 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
         df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce", format="mixed")
 
     if "dataimportacao" in df.columns:
-    df["dataimportacao"] = pd.to_datetime(
+        df["dataimportacao"] = pd.to_datetime(
         df["dataimportacao"],
         errors="coerce"
     )
