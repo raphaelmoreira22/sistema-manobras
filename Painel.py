@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import traceback
 from io import BytesIO
 from datetime import datetime
 from supabase_client import supabase
@@ -63,8 +64,6 @@ def carregar_banco():
 
         return normalizar_df(df)
 
-    
-    import traceback
     except Exception as e:
         st.error(str(e))
         st.code(traceback.format_exc())
