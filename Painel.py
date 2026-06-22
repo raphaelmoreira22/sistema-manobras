@@ -140,6 +140,9 @@ if arquivo:
 # =========================
 df = carregar_banco()
 
+st.write("Quantidade de registros:", len(df))
+st.write("Colunas:", df.columns.tolist())
+
 st.divider()
 
 st.subheader("🔎 Consulta")
@@ -231,29 +234,47 @@ with col1:
     st.metric("Total", len(resultado))
 
 with col2:
-    st.metric("Gerências", resultado["gerencia"].nunique() if not resultado.empty else 0)
+    qtd_gerencias = (
+        resultado["gerencia"].nunique()
+        if not resultado.empty and "gerencia" in resultado.columns
+        else 0
+    )
+
+    st.metric("Gerências", qtd_gerencias)
 
 with col3:
+
     hoje = datetime.today().date()
 
-    if "dataman" in resultado.columns:
-            resultado["dataman"] = pd.to_datetime(
+    if not resultado.empty and "dataman" in resultado.columns:
+
+        resultado["dataman"] = pd.to_datetime(
             resultado["dataman"],
             errors="coerce"
         )
 
         qtd_hoje = len(
-            resultado[resultado["dataman"].dt.date == hoje]
+            resultado[
+                resultado["dataman"].dt.date == hoje
+            ]
         )
+
     else:
         qtd_hoje = 0
 
     st.metric("Hoje", qtd_hoje)
 
 with col4:
-    qtd_complexas = len(
-        resultado[resultado["tipoman"].astype(str).str.upper() == "COMPLEXA"]
-    ) if not resultado.empty else 0
+
+    qtd_complexas = (
+        len(
+            resultado[
+                resultado["tipoman"].astype(str).str.upper() == "COMPLEXA"
+            ]
+        )
+        if not resultado.empty and "tipoman" in resultado.columns
+        else 0
+    )
 
     st.metric("🚨 Complexas", qtd_complexas)
 
