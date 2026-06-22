@@ -45,12 +45,6 @@ def carregar_banco():
         response = supabase.table("manobras").select("*").execute()
         df = pd.DataFrame(response.data)
 
-        st.write("Colunas encontradas:")
-        st.write(df.columns.tolist())
-
-        st.write("Primeiros registros:")
-        st.dataframe(df.head())
-
         if df.empty:
             return pd.DataFrame()
 
