@@ -245,7 +245,10 @@ with col4:
 # =========================
 # EXIBIÇÃO
 # =========================
-resultado = resultado.sort_values("dataman", ascending=False)
+if "dataman" in resultado.columns:
+    resultado = resultado.sort_values("dataman", ascending=False)
+else:
+    st.error(f"Coluna 'dataman' não encontrada. Colunas disponíveis: {resultado.columns.tolist()}")
 
 exibir = resultado.copy()
 
