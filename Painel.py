@@ -30,7 +30,7 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     if "dataman" in df.columns:
-        df["dataman"] = df["dataman"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        df["dataman"] = pd.to_datetime(df["dataman"], errors="coerce", format="mixed")
 
     if "dataimportacao" in df.columns:
         df["dataimportacao"] = df["dataimportacao"].dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -227,9 +227,16 @@ with col2:
     st.metric("Gerências", resultado["gerencia"].nunique() if not resultado.empty else 0)
 
 with col3:
-    hoje = pd.Timestamp.today().date()
-    qtd_hoje = len(resultado[resultado["dataman"].dt.date == hoje]) if not resultado.empty else 0
-    st.metric("Hoje", qtd_hoje)
+    if "dataman" in resultado.columns:
+    resultado["dataman"] = pd.to_datetime(resultado["dataman"], errors="coerce")
+
+    qtd_hoje = len(
+        resultado[
+            resultado["dataman"].dt.date == hoje
+        ]
+    )
+    else:
+        qtd_hoje = 0
 
 with col4:
     qtd_complexas = len(
