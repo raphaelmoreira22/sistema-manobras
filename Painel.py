@@ -40,6 +40,13 @@ def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 @st.cache_data(ttl=60)
 def carregar_banco():
+
+st.write("Colunas encontradas:")
+st.write(df.columns.tolist())
+
+st.write("Primeiros registros:")
+st.dataframe(df.head())
+    
     try:
         response = supabase.table("manobras").select("*").execute()
         df = pd.DataFrame(response.data)
