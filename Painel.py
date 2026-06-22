@@ -65,7 +65,6 @@ def carregar_banco():
 
     
     import traceback
-
     except Exception as e:
         st.error(str(e))
         st.code(traceback.format_exc())
